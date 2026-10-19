@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Navigator's Map - MazeEngine</title>
+    <style>
+        /* --- PIRATES OF THE CARIBBEAN THEME VARIABLES --- */
+        :root[data-theme="dark"] {
+            --bg-color: #090d16;          /* Deep midnight ocean */
+            --panel-bg: #121824;          /* Ship cabin dark wood */
+            --text-color: #ebdcb2;        /* Aged parchment text */
+            --text-muted: #8a99ad;        /* Faded ink */
+            --accent-gold: #f3b61f;       /* Sunken treasure gold */
+            --accent-glow: rgba(243, 182, 31, 0.4);
+            --border-color: #2b3748;      /* Weathered iron border */
+            --wall-color: #26211d;        /* Dark ship timber */
+            --path-color: #f3b61f;        /* Glowing treasure gold */
+            --canvas-bg: #05070a;         /* Deep void before reveal */
+        }
+
+        :root[data-theme="light"] {
+            --bg-color: #f5f0e1;          /* Aged parchment paper */
+            --panel-bg: #fffbf0;          /* Clean chart paper */
+            --text-color: #2b221e;        /* Dark captain's ink */
+            --text-muted: #736357;        /* Faded brown ink */
+            --accent-gold: #b45309;       /* Burnished compass brass */
+            --accent-glow: rgba(180, 83, 9, 0.3);
+            --border-color: #d1c4a9;      /* Aged map border */
+            --wall-color: #785e49;        /* Teak wood walls */
+            --path-color: #d97706;        /* Amber trail */
+            --canvas-bg: #14100d;         /* Deep charcoal ink */
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Georgia', serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* --- FLEXING ANIMATIONS --- */
+        @keyframes slideUpFade {
+            0% { opacity: 0; transform: translateY(25px) scale(0.98); }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        @keyframes compassSpin {
+            0% { transform: rotate(0deg); }
+            25% { transform: rotate(-10deg); }
+            75% { transform: rotate(10deg); }
+            100% { transform: rotate(0deg); }
+        }
+
+        @keyframes pulseGlow {
+            0% { box-shadow: 0 0 5px var(--accent-glow); }
+            50% { box-shadow: 0 0 22px var(--accent-gold); }
+            100% { box-shadow: 0 0 5px var(--accent-glow); }
+        }
+
+        @keyframes canvasBreathing {
+            0% { box-shadow: 0 0 10px rgba(0,0,0,0.4); }
+            50% { box-shadow: 0 0 25px var(--accent-glow); }
+            100% { box-shadow: 0 0 10px rgba(0,0,0,0.4); }
+        }
+
+        .anim-enter {
+            animation: slideUpFade 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        /* HEADER */
+        header {
+            background-color: var(--panel-bg);
+            border-bottom: 2px solid var(--border-color);
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .compass-icon {
+            font-size: 1.6rem;
+            display: inline-block;
+            cursor: pointer;
+        }
+        .compass-icon:hover {
+            animation: compassSpin 0.6s ease-in-out;
+        }
+
+        header h1 {
+            font-size: 1.3rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        header p {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-family: sans-serif;
+        }
+
+        /* THEME TOGGLE BUTTON */
+        .theme-toggle {
+            background: none;
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 8px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: sans-serif;
+            font-size: 0.85rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: transform 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+        }
+
+        .theme-toggle:hover {
+            border-color: var(--accent-gold);
+            color: var(--accent-gold);
+            transform: translateY(-2px);
+        }
+
+        /* MAIN CENTERED CONTAINER */
+        main {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .navigator-box {
+            background-color: var(--panel-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 12px 35px rgba(0,0,0,0.35);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            max-width: 780px;
+            width: 100%;
+        }
+
+        /* CONTROL BAR */
+        .control-bar {
+            width: 100%;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px dashed var(--border-color);
+        }
+
+        .input-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: sans-serif;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .input-group label {
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+        }
+
+        input[type="number"] {
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.95rem;
+            width: 140px;
+            outline: none;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        input[type="number"]:focus {
+            border-color: var(--accent-gold);
+            box-shadow: 0 0 8px var(--accent-glow);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        button.action-btn {
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 9px 16px;
+            border-radius: 8px;
+            font-family: sans-serif;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        button.action-btn:hover {
+            border-color: var(--accent-gold);
+            color: var(--accent-gold);
+            transform: translateY(-2px);
+        }
+
+        button.action-btn:active {
+            transform: translateY(1px);
+        }
+
+        button.primary-btn {
+            background-color: var(--accent-gold);
+            border: none;
+            color: #090d16;
+            font-weight: 700;
+        }
+
+        :root[data-theme="light"] button.primary-btn {
+            color: #fffbf0;
+        }
+
+        button.primary-btn:hover {
+            opacity: 0.95;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px var(--accent-glow);
+        }
+
+        /* GLOWING PLAY BUTTON */
+        button.play-btn {
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            cursor: not-allowed;
+        }
+
+        button.play-btn.ready {
+            background-color: var(--accent-gold);
+            border-color: var(--accent-gold);
+            color: #090d16;
+            cursor: pointer;
+            animation: pulseGlow 2s infinite;
+        }
+
+        :root[data-theme="light"] button.play-btn.ready {
+            color: #fffbf0;
+        }
+
+        button.play-btn.ready:hover {
+            transform: translateY(-2px);
+            filter: brightness(1.1);
+        }
+
+        /* CANVAS CONTAINER */
+        .canvas-frame {
+            background-color: var(--canvas-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            transition: box-shadow 0.3s ease;
+        }
+
+        .canvas-frame.animating {
+            animation: canvasBreathing 2.5s infinite ease-in-out;
+        }
+
+        #mazeCanvas {
+            display: block;
+            width: 100%;           /* Scales fluidly to fit small screens or zoom levels */
+            max-width: 720px;      /* Caps display size on high-res desktops */
+            height: auto;          /* Maintains proper 4:3 aspect ratio */
+        }
+
+        /* FOOTER */
+        footer {
+            text-align: center;
+            padding: 12px;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-family: sans-serif;
+            border-top: 1px solid var(--border-color);
+            background-color: var(--panel-bg);
+        }
+    </style>
+</head>
+<body class="anim-enter">
+
+    <!-- HEADER -->
+    <header>
+        <div class="logo-area">
+            <span class="compass-icon" onclick="randomizeSeed()" title="Spin Compass">🧭</span>
+            <div>
+                <h1>The Navigator's Map</h1>
+                <p>Chart Your Course Through the Labyrinth</p>
+            </div>
+        </div>
+        <button class="theme-toggle" onclick="toggleTheme()">
+            <span id="themeIcon">☀️</span> <span id="themeText">Light Log</span>
+        </button>
+    </header>
+
+    <!-- MAIN CENTER -->
+    <main>
+        <div class="navigator-box">
+            
+            <!-- CONTROLS -->
+            <div class="control-bar">
+                <div class="input-group">
+                    <label>Map Seed:</label>
+                    <input type="number" id="seedInput" placeholder="e.g. 42">
+                </div>
+
+                <div class="btn-group">
+                    <button class="action-btn" onclick="randomizeSeed()">🎲 Random</button>
+                    <button class="action-btn primary-btn" onclick="fetchMazeData()">🗺️ Chart Course</button>
+                    <button id="playBtn" class="action-btn play-btn" disabled onclick="playCinematicAnimation()">▶️ Reveal Path</button>
+                </div>
+            </div>
+
+            <!-- CANVAS SCREEN (40x30 resolution buffer mapped responsively via CSS) -->
+            <div class="canvas-frame" id="canvasFrame">
+                <canvas id="mazeCanvas" width="720" height="540"></canvas>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- FOOTER -->
+    <footer>
+        MazeEngine &bull; Guided by Deterministic C# Shunting & Backtracking Tides
+    </footer>
+
+    <!-- SCRIPT LOGIC -->
+    <script>
+        const COLS = 40;
+        const ROWS = 30;
+        const CELL_SIZE = 18;
+
+        const canvas = document.getElementById('mazeCanvas');
+        const ctx = canvas.getContext('2d');
+        const seedInput = document.getElementById('seedInput');
+        const playBtn = document.getElementById('playBtn');
+        const canvasFrame = document.getElementById('canvasFrame');
+
+        let sortedCells = [];
+        let isPlaying = false;
+        let animationFrameId = null;
+
+        // Initialize canvas to void on start
+        resetCanvasToVoid();
+
+        function resetCanvasToVoid() {
+            ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--canvas-bg').trim();
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', newTheme);
+
+            document.getElementById('themeIcon').textContent = newTheme === 'dark' ? '☀️' : '🌙';
+            document.getElementById('themeText').textContent = newTheme === 'dark' ? 'Light Log' : 'Dark Abyss';
+            
+            if (!isPlaying && sortedCells.length === 0) {
+                resetCanvasToVoid();
+            }
+        }
+
+        function randomizeSeed() {
+            seedInput.value = Math.floor(Math.random() * 2147483647);
+        }
+
+        async function fetchMazeData() {
+            let seedVal = seedInput.value.trim();
+            if (!seedVal) {
+                randomizeSeed();
+                seedVal = seedInput.value;
+            }
+
+            // Disable play button during computation
+            playBtn.disabled = true;
+            playBtn.classList.remove('ready');
+
+            try {
+                // Sends payload as JSON body matching sealed record Maze_Req(int Seed)
+                const response = await fetch('/GetMaze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ Seed: parseInt(seedVal) })
+                });
+
+                if (!response.ok) throw new Error("Failed to chart map.");
+
+                const data = await response.json();
+                processMazePayload(data);
+
+                // Enable Play Button with glow effect
+                playBtn.disabled = false;
+                playBtn.classList.add('ready');
+
+            } catch (err) {
+                console.error(err);
+                alert("The captain's server failed to chart the maze.");
+            }
+        }
+
+        function processMazePayload(data) {
+            // Unpacks 1D flat array from C# backend (Ret_cells)
+            const cellsArray = data.cells || data.Cells;
+            const lenX = data.len_x || data.Len_x; // 40
+            const lenY = data.len_y || data.Len_y; // 30
+
+            sortedCells = [];
+
+            for (let i = 0; i < cellsArray.length; i++) {
+                const cell = cellsArray[i];
+                
+                const x = i % lenX;
+                const y = Math.floor(i / lenX);
+
+                sortedCells.push({
+                    x: x,
+                    y: y,
+                    type: cell.Cell_type !== undefined ? cell.Cell_type : cell.cell_type,
+                    step: cell.Step_count !== undefined ? cell.Step_count : cell.step_count
+                });
+            }
+
+            // Sort cells by Step_count for chronological cinematic carve order
+            sortedCells.sort((a, b) => a.step - b.step);
+            resetCanvasToVoid();
+        }
+
+        function playCinematicAnimation() {
+            if (sortedCells.length === 0 || isPlaying) return;
+            isPlaying = true;
+            
+            resetCanvasToVoid();
+            canvasFrame.classList.add('animating'); // Triggers breathing animation
+
+            let currentIndex = 0;
+            const totalCells = sortedCells.length;
+            const batchSize = Math.max(1, Math.floor(totalCells / 500)); // Fluid high-speed playback
+
+            function step() {
+                const limit = Math.min(currentIndex + batchSize, totalCells);
+                for (let i = currentIndex; i < limit; i++) {
+                    const c = sortedCells[i];
+                    drawCell(c.x, c.y, c.type);
+                }
+                currentIndex = limit;
+
+                if (currentIndex < totalCells) {
+                    animationFrameId = requestAnimationFrame(step);
+                } else {
+                    isPlaying = false;
+                    canvasFrame.classList.remove('animating');
+                }
+            }
+            animationFrameId = requestAnimationFrame(step);
+        }
+
+        function drawCell(x, y, cellType) {
+            const isWall = (cellType === 0 || cellType === 'Wall');
+            
+            const rootStyle = getComputedStyle(document.documentElement);
+            const wallColor = rootStyle.getPropertyValue('--wall-color').trim();
+            const pathColor = rootStyle.getPropertyValue('--path-color').trim();
+
+            ctx.fillStyle = isWall ? wallColor : pathColor;
+            
+            const xPos = x * CELL_SIZE + 1;
+            const yPos = y * CELL_SIZE + 1;
+            const size = CELL_SIZE - 2;
+            
+            ctx.fillRect(xPos, yPos, size, size);
+        }
+    </script>
+</body>
+</html>
